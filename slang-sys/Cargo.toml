@@ -7,7 +7,7 @@ edition = "2021"
 paste = "1.0.15"
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = "0.70.1"
 cmake = { version = "0.1.50", optional = true }
 
 [features]

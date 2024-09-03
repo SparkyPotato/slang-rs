@@ -14,3 +14,6 @@ thiserror = "1.0.61"
 [features]
 default = []
 static = ["slang-sys/static"]
+
+[workspace]
+members = [".", "slang-sys"]

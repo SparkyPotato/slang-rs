@@ -10,7 +10,7 @@ use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     ptr, slice,
     str::Utf8Error,
 };
@@ -379,7 +379,7 @@ assert_size_and_align!(TargetDesc, sys::slang_TargetDesc);
 #[repr(transparent)]
 pub struct TargetDescBuilder<'a>(TargetDesc, PhantomData<&'a ()>);
 
-impl TargetDescBuilder<'_> {
+impl<'a> TargetDescBuilder<'a> {
     #[inline]
     pub fn format(mut self, format: CompileTarget) -> Self {
         self.0.format = format;
@@ -422,7 +422,7 @@ impl TargetDescBuilder<'_> {
     #[inline]
     pub fn compiler_option_entries(
         mut self,
-        compiler_option_entries: &mut [CompilerOptionEntry],
+        compiler_option_entries: &'a mut [CompilerOptionEntry],
     ) -> Self {
         self.0.compiler_option_entries = compiler_option_entries.as_mut_ptr();
         self.0.compiler_option_entry_count = compiler_option_entries.len() as _;
@@ -516,11 +516,18 @@ pub struct SessionDescBuilder<'a> {
     phantom: PhantomData<&'a ()>,
 }
 
-impl SessionDescBuilder<'_> {
+impl<'a> SessionDescBuilder<'a> {
     #[inline]
-    pub fn targets(mut self, targets: &[TargetDescBuilder]) -> Self {
+    pub fn targets(mut self, targets: &'a [TargetDescBuilder]) -> Self {
         self.desc.targets = targets.as_ptr().cast();
         self.desc.target_count = targets.len() as _;
+        self
+    }
+
+    #[inline]
+    pub fn search_paths(mut self, search_paths: &'a [*const c_char]) -> Self {
+        self.desc.search_paths = search_paths.as_ptr();
+        self.desc.search_path_count = search_paths.len() as _;
         self
     }
 
@@ -560,7 +567,7 @@ impl SessionDescBuilder<'_> {
     #[inline]
     pub fn compiler_option_entries(
         mut self,
-        compiler_option_entries: &mut [CompilerOptionEntry],
+        compiler_option_entries: &'a mut [CompilerOptionEntry],
     ) -> Self {
         self.desc.compiler_option_entries = compiler_option_entries.as_mut_ptr();
         self.desc.compiler_option_entry_count = compiler_option_entries.len() as _;
@@ -696,6 +703,20 @@ impl Module {
             diagnostics,
         )?;
         Ok(EntryPoint(entry_point))
+    }
+
+    #[inline]
+    pub fn get_dependency_files(&mut self) -> Vec<&str> {
+        unsafe {
+            let count = vtable_call!(self.0, getDependencyFileCount());
+            let mut files = vec![""; count as usize];
+            for i in 0..count {
+                files[i as usize] = CStr::from_ptr(vtable_call!(self.0, getDependencyFilePath(i)))
+                    .to_str()
+                    .unwrap();
+            }
+            files
+        }
     }
 }
 
